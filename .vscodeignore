@@ -1,0 +1,11 @@
+.vscode/**
+.vscode-test/**
+backend/**
+node_modules/**
+tsconfig.json
+pyproject.toml
+setup.sh
+docker-compose.yml
+.env.example
+**/*.ts
+!dist/*.js
