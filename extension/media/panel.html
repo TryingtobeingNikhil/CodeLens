@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeLens Dashboard</title>
+    <style>
+        :root {
+            /* Semantic Variables Mapping Native Code Lens UI */
+            --bar-green: #3fb950;
+            --bar-amber: #d29922;
+            --bar-red: #f85149;
+            --card-radius: 8px;
+        }
+
+        body {
+            font-family: var(--vscode-font-family);
+            background-color: var(--vscode-sideBar-background);
+            color: var(--vscode-sideBarTitle-foreground);
+            padding: 16px;
+            margin: 0;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        /* Top Structure Layer */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            padding-bottom: 10px;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--bar-green);
+        }
+        .status-dot.amber { background-color: var(--bar-amber); }
+        .status-dot.red { background-color: var(--bar-red); }
+
+        .reindex-btn {
+            background: transparent;
+            color: var(--vscode-textLink-foreground);
+            border: none;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .reindex-btn:hover {
+            color: var(--vscode-textLink-activeForeground);
+            text-decoration: underline;
+        }
+
+        /* Primary Search Block Element */
+        .search-container {
+            margin-bottom: 24px;
+        }
+        
+        .search-input-wrapper {
+            position: relative;
+            margin-bottom: 8px;
+        }
+
+        /* Strictly Implemented CSS input requirement (0.15s ease) */
+        .search-input {
+            width: 100%;
+            box-sizing: border-box;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 2px solid var(--vscode-input-border);
+            padding: 10px 14px;
+            border-radius: 6px;
+            outline: none;
+            font-family: var(--vscode-font-family);
+            font-size: 13px;
+            transition: border-color 0.15s ease;
+        }
+        
+        .search-input:focus {
+            border-color: var(--vscode-focusBorder);
+        }
+
+        .search-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+        
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--vscode-descriptionForeground);
+            cursor: pointer;
+        }
+
+        .search-btn {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .search-btn:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+
+        .metadata-row {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            padding-bottom: 8px;
+        }
+
+        /* Response Render Containers */
+        #results-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        /* Core Result Card Specifications */
+        .result-card {
+            background-color: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: var(--card-radius);
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            opacity: 0;
+            transform: translateY(6px);
+            animation: staggerFadeIn 0.3s forwards ease-out;
+        }
+        
+        @keyframes staggerFadeIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            font-size: 11px;
+        }
+
+        .filename {
+            color: var(--vscode-terminal-ansiYellow);
+            font-family: var(--vscode-editor-font-family);
+            word-break: break-all;
+        }
+        
+        .line-range {
+            color: var(--vscode-descriptionForeground);
+            white-space: nowrap;
+        }
+
+        .symbol-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .symbol-name {
+            color: var(--vscode-symbolIcon-functionForeground);
+            font-weight: bold;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 13px;
+            max-width: 75%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .score-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .score-track {
+            width: 40px;
+            height: 4px;
+            background-color: var(--vscode-scrollbarSlider-background);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .score-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.4s ease;
+        }
+
+        .divider {
+            height: 1px;
+            margin: 4px 0;
+            border-top: 1px dashed var(--vscode-panel-border);
+        }
+
+        .code-block {
+            background-color: var(--vscode-textCodeBlock-background);
+            font-family: var(--vscode-editor-font-family);
+            font-size: 12px;
+            line-height: 1.4;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 0;
+            max-height: calc(12px * 1.4 * 8); /* strictly bounds exactly to 8 max lines */
+            overflow: hidden;
+            color: var(--vscode-editor-foreground);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .card-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 4px;
+        }
+
+        /* Using ghost style buttons natively defined via secondary variables */
+        .ghost-btn {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        
+        .ghost-btn:hover {
+            background-color: var(--vscode-button-secondaryHoverBackground);
+        }
+
+        /* Pure CSS Shimmer Skeleton State */
+        .skeleton {
+            background: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: var(--card-radius);
+            padding: 12px;
+            height: 120px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .skeleton::after {
+            content: '';
+            position: absolute;
+            top: 0; right: 0; bottom: 0; left: 0;
+            background-image: linear-gradient(
+                90deg, 
+                transparent 0%, 
+                var(--vscode-panel-border) 50%, 
+                transparent 100%
+            );
+            animation: shimmer 1.5s infinite;
+            opacity: 0.2;
+            transform: skewX(-20deg);
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        /* Initial Chip Configuration Defaults */
+        .chips {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        
+        .chip {
+            background-color: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .chip:hover {
+            border-color: var(--vscode-focusBorder);
+        }
+
+        /* Offline LLM Extracted Container Render Mapping */
+        .ai-explanation {
+            background-color: var(--vscode-notificationsInfoIcon-foreground);
+            color: var(--vscode-editor-background);
+            padding: 12px;
+            border-radius: var(--card-radius);
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+        
+        /* Fully Native Inline Polyfill Minimalistic Engine logic bridging multiple languages */
+        .hljs-keyword { color: #569CD6; font-weight: bold; }
+        .hljs-string { color: #CE9178; }
+        .hljs-number { color: #B5CEA8; }
+        .hljs-comment { color: #6A9955; font-style: italic; }
+        
+        .hidden { display: none !important; }
+        
+        /* Progress View Interface Tracking (SSE Mode bounds) */
+        .progress-view {
+            text-align: center;
+            padding: 40px 0;
+        }
+        .progress-bar-container {
+            width: 100%;
+            height: 6px;
+            background: var(--vscode-progressBar-background);
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--vscode-button-background);
+            width: 0%;
+            transition: width 0.2s ease;
+        }
+        .progress-filename {
+            font-family: var(--vscode-editor-font-family);
+            font-size: 11px;
+            color: var(--vscode-terminal-ansiYellow);
+            margin-bottom: 8px;
+            min-height: 14px;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Application Action Header -->
+    <div class="header">
+        <div class="header-left">
+            <span class="status-dot tooltip" id="health-dot" title="Health Indicator"></span>
+            <strong>CodeLens</strong>
+            <span id="chunk-count-badge">0 chunks</span>
+        </div>
+        <button class="reindex-btn" id="btn-reindex">[⟳ Re-index]</button>
+    </div>
+
+    <!-- Active Vector Embed Lookup Prompt -->
+    <div class="search-container">
+        <div class="search-input-wrapper">
+            <input type="text" id="query-input" class="search-input" placeholder="Ask anything about your codebase..." autocomplete="off">
+        </div>
+        <div class="search-controls">
+            <label class="checkbox-wrapper">
+                <input type="checkbox" id="chk-explain">
+                Include AI explanation
+            </label>
+            <button class="search-btn" id="btn-search">Search ↵</button>
+        </div>
+    </div>
+
+    <!-- Dynamic Context Render Wrappers -->
+    <div id="metadata-header" class="metadata-row hidden">
+        <span id="meta-results-txt">0 results · 0ms</span>
+    </div>
+    
+    <div id="explain-container"></div>
+    
+    <!-- Active Background Processing Queue Screen -->
+    <div id="progress-container" class="progress-view hidden">
+        <div class="progress-filename" id="prog-file">...</div>
+        <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="prog-bar"></div>
+        </div>
+        <div style="font-size: 11px; color: var(--vscode-descriptionForeground);" id="prog-text">
+            Indexed <span id="prog-pct">0</span> / 100% · <span id="prog-chunks">0</span> chunks found
+        </div>
+    </div>
+
+    <!-- Live ANN Evaluation Node Elements Return -->
+    <ul id="results-container">
+        <div class="chips" id="empty-state">
+            <div class="chip" data-query="where does auth validation happen?">where does auth validation happen?</div>
+            <div class="chip" data-query="show all database write operations">show all database write operations</div>
+            <div class="chip" data-query="which functions handle error logging?">which functions handle error logging?</div>
+        </div>
+    </ul>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+        
+        const uiTokens = {
+            input: document.getElementById('query-input'),
+            btnSearch: document.getElementById('btn-search'),
+            btnReindex: document.getElementById('btn-reindex'),
+            chkExplain: document.getElementById('chk-explain'),
+            resultsCont: document.getElementById('results-container'),
+            metaRow: document.getElementById('metadata-header'),
+            metaTxt: document.getElementById('meta-results-txt'),
+            emptyState: document.getElementById('empty-state'),
+            chunkBadge: document.getElementById('chunk-count-badge'),
+            healthDot: document.getElementById('health-dot'),
+            explainCont: document.getElementById('explain-container'),
+            
+            progCont: document.getElementById('progress-container'),
+            progFile: document.getElementById('prog-file'),
+            progBar: document.getElementById('prog-bar'),
+            progPct: document.getElementById('prog-pct'),
+            progChunks: document.getElementById('prog-chunks')
+        };
+        
+        let navigationIndex = -1;
+        let resultElements = [];
+
+        // Inline lightweight custom minified stub executing high performance DOM render constraints matching user spec without fetching via Cloud CDN
+        const syntaxParser = {
+            highlight: (code) => {
+                return code
+                    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") 
+                    .replace(/("(?:\\"|[^"])*"|'(?:\\'|[^'])*')/g, '<span class="hljs-string">$1</span>')
+                    .replace(/(\/\/.*|\/\*[\s\S]*?\*\/|#.*)/g, '<span class="hljs-comment">$1</span>')
+                    .replace(/\b(function|def|class|struct|impl|import|export|if|else|return|const|let|var|await|async|type|interface|public|private)\b/g, '<span class="hljs-keyword">$1</span>')
+                    .replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="hljs-number">$1</span>');
+            }
+        };
+
+        function spawnShimmerLoaders() {
+            uiTokens.resultsCont.innerHTML = '';
+            uiTokens.emptyState?.classList.add('hidden');
+            for(let i = 0; i < 3; i++) {
+                uiTokens.resultsCont.innerHTML += `<div class="skeleton"></div>`;
+            }
+        }
+
+        function execSearchWorkflow() {
+            const raw = uiTokens.input.value.trim();
+            if (!raw) return;
+            
+            spawnShimmerLoaders();
+            uiTokens.metaRow.classList.add('hidden');
+            uiTokens.explainCont.innerHTML = '';
+            
+            vscode.postMessage({
+                type: 'query',
+                text: raw,
+                explain: uiTokens.chkExplain.checked
+            });
+        }
+
+        uiTokens.btnSearch.addEventListener('click', execSearchWorkflow);
+        uiTokens.btnReindex.addEventListener('click', () => {
+             uiTokens.resultsCont.innerHTML = '';
+             uiTokens.metaRow.classList.add('hidden');
+             uiTokens.explainCont.innerHTML = '';
+             uiTokens.emptyState?.classList.add('hidden');
+             
+             uiTokens.progCont.classList.remove('hidden');
+             uiTokens.progBar.style.width = '0%';
+             vscode.postMessage({ type: 'reindex' });
+        });
+
+        uiTokens.input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                execSearchWorkflow();
+            } else if (e.key === 'Escape') {
+                uiTokens.input.value = '';
+                uiTokens.input.blur();
+            } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                if (resultElements.length > 0) {
+                    e.preventDefault();
+                    if (e.key === 'ArrowDown') navigationIndex = Math.min(navigationIndex + 1, resultElements.length - 1);
+                    if (e.key === 'ArrowUp') navigationIndex = Math.max(navigationIndex - 1, 0);
+                    
+                    resultElements.forEach(el => el.style.borderColor = 'var(--vscode-panel-border)');
+                    if (navigationIndex >= 0) {
+                        resultElements[navigationIndex].style.borderColor = 'var(--vscode-focusBorder)';
+                        resultElements[navigationIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                }
+            }
+        });
+
+        document.querySelectorAll('.chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                uiTokens.input.value = chip.dataset.query;
+                execSearchWorkflow();
+            });
+        });
+
+        const deriveMetricIntensity = (val) => {
+            if (val > 0.85) return 'var(--bar-green)';
+            if (val > 0.70) return 'var(--bar-amber)';
+            return 'var(--bar-red)';
+        };
+
+        window.addEventListener('message', event => {
+            const stream = event.data;
+            switch (stream.type) {
+                case 'results':
+                    uiTokens.progCont.classList.add('hidden');
+                    uiTokens.resultsCont.innerHTML = '';
+                    uiTokens.metaRow.classList.remove('hidden');
+                    uiTokens.metaTxt.innerText = `${stream.data.length} results · ${stream.query_ms}ms`;
+                    
+                    if (stream.total_indexed) {
+                        uiTokens.chunkBadge.innerText = `${stream.total_indexed} chunks`;
+                    }
+                    
+                    if (stream.explain_text) {
+                        uiTokens.explainCont.innerHTML = `
+                            <div class="ai-explanation">
+                                <strong>AI Core Detail Analysis:</strong><br>
+                                ${stream.explain_text}
+                            </div>
+                        `;
+                    }
+
+                    if (stream.data.length === 0) {
+                        uiTokens.resultsCont.innerHTML = `<div style="text-align: center; color: var(--vscode-descriptionForeground); margin-top:20px;">No exact matches found structure. Consider attempting an internal index reload tracking mechanism.</div>`;
+                        return;
+                    }
+
+                    resultElements = [];
+                    navigationIndex = -1;
+
+                    stream.data.forEach((r, idx) => {
+                        const calculatedWidth = (Math.max(0, Math.min(1, r.score)) * 100).toFixed(0);
+                        const severityClassColor = deriveMetricIntensity(r.score);
+                        
+                        const li = document.createElement('li');
+                        li.className = 'result-card';
+                        li.style.animationDelay = `${idx * 50}ms`;
+                        
+                        li.innerHTML = `
+                            <div class="card-header">
+                                <span class="filename">${r.file_path}</span>
+                                <span class="line-range">line ${r.line_start}–${r.line_end}</span>
+                            </div>
+                            <div class="symbol-row">
+                                <span class="symbol-name" title="${r.symbol_name}">${r.symbol_name}</span>
+                                <div class="score-wrap">
+                                    <div class="score-track"><div class="score-fill" style="width: ${calculatedWidth}%; background-color: ${severityClassColor};"></div></div>
+                                    ${(r.score).toFixed(2)}
+                                </div>
+                            </div>
+                            <div class="divider"></div>
+                            <pre class="code-block">${syntaxParser.highlight(r.chunk_text)}</pre>
+                            <div class="card-actions">
+                                <button class="ghost-btn jump-btn" data-file="${r.file_path}" data-line="${r.line_start}">Jump to file →</button>
+                                <button class="ghost-btn cp-btn">Copy</button>
+                            </div>
+                        `;
+                        
+                        li.querySelector('.jump-btn').addEventListener('click', () => {
+                            vscode.postMessage({ type: 'jumpTo', file: r.file_path, line: r.line_start });
+                        });
+                        
+                        uiTokens.resultsCont.appendChild(li);
+                        resultElements.push(li);
+                    });
+                    
+                    break;
+                    
+                case 'indexProgress':
+                    uiTokens.progFile.innerText = stream.file;
+                    uiTokens.progBar.style.width = `${Math.min(100, stream.pct)}%`;
+                    uiTokens.progPct.innerText = Math.round(stream.pct);
+                    uiTokens.chunkBadge.innerText = stream.message;
+                    break;
+                    
+                case 'status':
+                    uiTokens.progCont.classList.add('hidden');
+                    uiTokens.chunkBadge.innerText = `${stream.chunks} chunks`;
+                    uiTokens.healthDot.className = 'status-dot'; 
+                    document.getElementById('empty-state')?.classList.remove('hidden');
+                    break;
+                    
+                case 'error':
+                    uiTokens.progCont.classList.add('hidden');
+                    uiTokens.healthDot.className = 'status-dot red';
+                    uiTokens.resultsCont.innerHTML = `<div style="color: var(--bar-red);">${stream.message}</div>`;
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>
