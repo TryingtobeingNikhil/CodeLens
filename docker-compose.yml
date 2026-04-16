@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - VECTORAI_DB_PATH=/app/.vectorai_db
+      - OLLAMA_HOST=http://ollama:11434
+      - EMBED_MODEL=nomic-embed-text
+      - CHUNK_SIZE=512
+      - TOP_K=10
+    volumes:
+      - ./backend:/app/backend
+      - ./shared:/app/shared
+      - vectorai_data:/app/.vectorai_db
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: >
+      sh -c "ollama serve & sleep 3 && ollama pull nomic-embed-text && wait"
+
+volumes:
+  vectorai_data:
+  ollama_data:
