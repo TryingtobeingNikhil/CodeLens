@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, ChildProcess, execSync } from 'child_process';
 import axios from 'axios';
 import { SearchPanelProvider } from './searchPanel';
 
@@ -9,6 +9,27 @@ let pollInterval: NodeJS.Timeout;
 
 const PORT = 8000;
 const API_URL = `http://127.0.0.1:${PORT}`;
+
+/** Find best available Python 3 (prefers 3.11, falls back to 3.12, then python3) */
+function detectPython(): string {
+    const candidates = [
+        '/usr/local/bin/python3.11',
+        '/usr/local/bin/python3.12',
+        '/usr/local/bin/python3',
+        '/usr/bin/python3',
+        'python3',
+    ];
+    for (const p of candidates) {
+        try {
+            execSync(`${p} --version`, { stdio: 'ignore' });
+            return p;
+        } catch { /* try next */ }
+    }
+    return 'python3';
+}
+
+const PYTHON = detectPython();
+const OLLAMA_BIN = '/Applications/Ollama.app/Contents/Resources/ollama';
 
 export async function activate(context: vscode.ExtensionContext) {
     // 1. Boot Python Backend Context
@@ -64,16 +85,29 @@ export async function activate(context: vscode.ExtensionContext) {
 
 function startBackendServer(context: vscode.ExtensionContext) {
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
+    // The backend lives in the 'codelens' sub-folder of the workspace
     const cwd = workspaceRoot ? `${workspaceRoot}/codelens` : __dirname;
-    
-    // Natively spans child Python environment securely
-    backendProcess = spawn('python3', ['-m', 'uvicorn', 'backend.main:app', '--host', '127.0.0.1', '--port', PORT.toString()], {
-        cwd: cwd,
-        detached: false // Ensures child cleanup alongside parent 
-    });
 
-    backendProcess.stdout?.on('data', (data) => console.log(`[CodeLens Backend]: ${data}`));
-    backendProcess.stderr?.on('data', (data) => console.error(`[CodeLens Error]: ${data}`));
+    backendProcess = spawn(
+        PYTHON,
+        ['-m', 'uvicorn', 'backend.main:app', '--host', '127.0.0.1', '--port', PORT.toString()],
+        {
+            cwd,
+            detached: false,
+            env: {
+                ...process.env,
+                PATH: `/Applications/Ollama.app/Contents/Resources:${process.env.PATH}`,
+                OLLAMA_HOST: 'http://localhost:11434',
+            }
+        }
+    );
+
+    backendProcess.stdout?.on('data', (d) => console.log(`[CodeLens]: ${d}`));
+    backendProcess.stderr?.on('data', (d) => console.error(`[CodeLens ERR]: ${d}`));
+    backendProcess.on('exit', (code) => {
+        console.warn(`[CodeLens] Backend exited with code ${code}`);
+        statusBarItem.text = '$(database) CodeLens: Offline';
+    });
 }
 
 function startPolling() {
