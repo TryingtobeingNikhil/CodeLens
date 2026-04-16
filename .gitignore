@@ -8,3 +8,8 @@ venv/
 last_repo.json
 .DS_Store
 *.vsix
+.vectorai_db/
+last_repo.json
+*.vsix
+node_modules/
+dist/

@@ -1,40 +1,87 @@
 {
   "name": "codelens",
-  "displayName": "CodeLens",
-  "description": "Offline semantic codebase search",
-  "version": "0.1.0",
+  "displayName": "CodeLens — Offline Semantic Search",
+  "description": "Natural-language semantic search for your codebase. 100% offline, powered by Actian VectorAI DB + Ollama.",
+  "version": "0.2.0",
+  "publisher": "nikhilmourya",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TryingtobeingNikhil/CodeLens.git"
+  },
   "engines": {
     "vscode": "^1.86.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "semantic search",
+    "code search",
+    "offline",
+    "AI",
+    "vector database"
   ],
   "activationEvents": [
     "onStartupFinished"
   ],
-  "main": "./dist/extension.js",
+  "main": "./dist/extension/src/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codelens-sidebar",
+          "title": "CodeLens Search",
+          "icon": "media/codelens-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "codelens-sidebar": [
+        {
+          "type": "webview",
+          "id": "codelens.sidebar",
+          "name": "Semantic Search"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "codelens.search",
-        "title": "CodeLens: Semantic Search"
+        "title": "CodeLens: Semantic Search",
+        "icon": "$(search)"
       },
       {
-        "command": "codelens.index",
-        "title": "CodeLens: Index Workspace"
+        "command": "codelens.reindex",
+        "title": "CodeLens: Re-index Workspace",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "codelens.showStatus",
+        "title": "CodeLens: Show Status"
       }
-    ]
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "codelens.reindex",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
-    "build": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "compile": "tsc -p ./",
-    "vscode:prepublish": "npm run compile"
+    "build":            "tsc -p ./",
+    "watch":            "tsc -watch -p ./",
+    "compile":          "tsc -p ./",
+    "vscode:prepublish": "npm run compile",
+    "package":          "vsce package --no-dependencies"
   },
   "devDependencies": {
     "@types/vscode": "^1.86.0",
     "@types/node": "18.x",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "@vscode/vsce": "^3.0.0"
   },
   "dependencies": {
     "axios": "^1.6.8"
