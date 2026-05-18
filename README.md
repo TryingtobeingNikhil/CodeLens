@@ -25,7 +25,7 @@
 
 ## 🎯 The Problem
 
-You join a large codebase. You know there's *some* function that handles JWT token refresh — but `Ctrl+F "token"` returns 847 matches. You spend 20 minutes hunting. **That's broken.**
+I join a large codebase. I know there's *some* function that handles JWT token refresh — but `Ctrl+F "token"` returns 847 matches. I spend 20 minutes hunting. **That's broken.**
 
 Traditional code search is keyword-based. It matches *text*, not *intent*. It can't understand that **"find where user sessions expire"** and `def invalidate_jwt_token()` are the same concept.
 
