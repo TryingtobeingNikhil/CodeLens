@@ -398,7 +398,7 @@ MIT — see [LICENSE](LICENSE)
 
 <div align="center">
 
-**Built for the Actian VectorAI DB Hackathon** · April 2026
+**Built For hackthon & I literally killed it. ** · April 2026
 
 *CodeLens is proof that developer tools don't need the cloud to be powerful.*
 
