@@ -4,7 +4,7 @@
 
 # 🔍 CodeLens
 
-### *Natural-language search for your entire codebase — 100% offline, instant results*..
+### *Natural-language search for your entire codebase — 100% offline, instant results*
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
