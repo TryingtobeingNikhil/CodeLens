@@ -195,7 +195,7 @@ uvicorn backend.main:app --host 127.0.0.1 --port 8000
 
 | Layer | Technology | Purpose |
 |---|---|---|
-| **Vector Database** | Actian VectorAI DB | Embedded local ANN search — the core engine |
+| **Vector Database** | Actian VectorAI DB | Embedded local ANN search - the core engine |
 | **Embedding Model** | `nomic-embed-text` via Ollama | 768-dim code embeddings, fully offline |
 | **Code Parsing** | `tree-sitter` (6 languages) | AST-based semantic chunking |
 | **API Server** | FastAPI + Uvicorn | `POST /index`, `POST /query`, `GET /status` |
