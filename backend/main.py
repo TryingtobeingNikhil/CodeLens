@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from backend.config import Settings
 from backend.db_client import get_db
 from backend.indexer import Indexer
-from backend.query import ExplainError, explain_code, explain_results, run_query, search
+from backend.query import ExplainError, explain_code, explain_results, parse_query, run_query, search
 from backend.suggest import suggest
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -258,7 +258,8 @@ async def api_explain(req: ExplainRequest):
             found = await asyncio.to_thread(search, req.query, repo, req.top_k)
             if not found["results"]:
                 raise HTTPException(status_code=404, detail="No results to explain")
-            text = await asyncio.to_thread(explain_results, req.query, found["results"])
+            question = parse_query(req.query).text or req.query
+            text = await asyncio.to_thread(explain_results, question, found["results"])
         else:
             raise HTTPException(status_code=400, detail="Send `code` or `query`")
     except ExplainError as e:
