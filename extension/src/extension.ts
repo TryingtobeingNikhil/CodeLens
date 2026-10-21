@@ -9,6 +9,8 @@ let backendProcess: ChildProcess | undefined;
 let statusBarItem: vscode.StatusBarItem;
 let pollInterval: NodeJS.Timeout | undefined;
 let output: vscode.OutputChannel;
+let starting: Promise<void> | undefined;
+let wasOnline = false;
 
 const REQUIRED_MODULES = 'import fastapi, uvicorn, ollama, tree_sitter, numpy, watchdog, dotenv';
 
@@ -85,8 +87,8 @@ export async function activate(context: vscode.ExtensionContext) {
     // Don't block activation on the backend: the panel reports it as offline until it's up
     ensureBackend(context, client).finally(() => {
         provider.refreshStatus();
-        pollStatus(client, provider);
-        pollInterval = setInterval(() => pollStatus(client, provider), 15000);
+        pollStatus(context, client, provider);
+        pollInterval = setInterval(() => pollStatus(context, client, provider), 15000);
     });
 }
 
@@ -270,12 +272,20 @@ function backendEnv(): Record<string, string> {
     return env;
 }
 
-async function pollStatus(client: CodeLensClient, provider: SearchPanelProvider) {
-    const health = await client.health();
+async function pollStatus(context: vscode.ExtensionContext, client: CodeLensClient, provider: SearchPanelProvider) {
+    let health = await client.health();
+    if (!health && wasOnline && !starting && config().get<boolean>('autoStartBackend', true)) {
+        // The backend may have belonged to another window that has since closed
+        starting = ensureBackend(context, client).finally(() => { starting = undefined; });
+        await starting;
+        health = await client.health();
+        if (health) { provider.refreshStatus(); }
+    }
     if (!health) {
         statusBarItem.text = '$(database) CodeLens: Offline';
         return;
     }
+    wasOnline = true;
     try {
         const status = await client.status(provider.repoRoot());
         statusBarItem.text = status.indexing
