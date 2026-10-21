@@ -218,7 +218,7 @@ def _format_terminal(query: str, data: dict) -> str:
         file_info = f"\033[1;36m{r['file_path']}\033[0m:\033[36m{r['line_start']}\033[0m"
         symbol = f"\033[1;33m{r['symbol_name']}\033[0m"
         lines.append(f"\033[1;37m{i + 1}.\033[0m {file_info} ⚡ {symbol}  "
-                     f"\033[90m[Score: \033[1;35m{score}\033[90m · {r.get('match', '')}]\033[0m")
+                     f"\033[90m[similarity \033[1;35m{score}\033[90m · {r.get('match', '')}]\033[0m")
         snippet = r["chunk_text"].strip().split("\n")
         for snip_line in snippet[:3]:
             lines.append(f"    \033[90m│\033[0m \033[38;5;250m{snip_line.replace(chr(9), '    ')[:80]}\033[0m")

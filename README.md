@@ -43,6 +43,8 @@ Query: "embedding failures retry lang:py -in:tests"       (31 ms)
 3  backend/db_client.py:261      CodeLensDB.put_embeddings    method  both  0.67
 ```
 
+Results are ordered by the fused rank; the last column is the cosine similarity to the query, so it isn't always decreasing.
+
 All of it runs locally. Turn the WiFi off; it still works.
 
 ---
