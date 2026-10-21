@@ -1,6 +1,8 @@
 import json
 import os
+import threading
 
+from backend.indexer import Indexer
 from tests.conftest import write
 
 
@@ -33,3 +35,18 @@ def test_index_stream_then_query(client, repo):
 def test_bad_inputs(client):
     assert client.post("/query", json={"query": "  "}).status_code == 400
     assert client.post("/index", json={"repo_path": "/definitely/not/here"}).status_code == 400
+
+
+def test_second_index_request_is_rejected_while_first_runs(client, repo, monkeypatch):
+    release = threading.Event()
+    original = Indexer.index
+
+    def slow_index(self, *args, **kwargs):
+        release.wait(5)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Indexer, "index", slow_index)
+    with client.stream("POST", "/index", json={"repo_path": repo}) as resp:
+        assert client.post("/index", json={"repo_path": repo}).status_code == 409
+        release.set()
+        assert '"complete"' in resp.read().decode()
