@@ -163,3 +163,15 @@ def test_sentence_word_matching_a_helper_name_is_not_boosted(db, embedder, repo)
     ix.index()
     assert search("break camelCase names into words", repo=ix.repo)["results"][0]["symbol_name"] == "split_identifier"
     assert search("names", repo=ix.repo)["results"][0]["symbol_name"] == "names"
+
+
+def test_watcher_start_failure_is_not_fatal(tmp_path, monkeypatch):
+    from backend import indexer as indexer_mod
+
+    def boom(self):
+        raise OSError("inotify watch limit reached")
+
+    monkeypatch.setattr(indexer_mod.Observer, "start", boom)
+    idx = indexer_mod.Indexer(str(tmp_path), db=object(), embedder=object())
+    idx.start_watchdog()
+    assert idx.observer is None
