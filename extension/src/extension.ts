@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { spawn, spawnSync, ChildProcess } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import { CodeLensClient } from './client';
 import { SearchPanelProvider } from './searchPanel';
 
@@ -115,19 +115,34 @@ function pythonCandidates(context: vscode.ExtensionContext, backendDir: string):
         'python3', 'python'].filter(Boolean);
 }
 
-function findPython(context: vscode.ExtensionContext, backendDir: string): string | undefined {
-    return pythonCandidates(context, backendDir).find(
-        p => spawnSync(p, ['-c', REQUIRED_MODULES], { cwd: backendDir, timeout: 20000 }).status === 0,
-    );
+/** Exit code of a short probe command, without blocking the extension host. */
+function probe(cmd: string, args: string[], timeout: number, cwd?: string): Promise<number | null> {
+    return new Promise(resolve => {
+        const child = spawn(cmd, args, { cwd, timeout, stdio: 'ignore' });
+        child.on('error', () => resolve(null));
+        child.on('exit', code => resolve(code));
+    });
+}
+
+async function findPython(context: vscode.ExtensionContext, backendDir: string): Promise<string | undefined> {
+    for (const p of pythonCandidates(context, backendDir)) {
+        if (await probe(p, ['-c', REQUIRED_MODULES], 20000, backendDir) === 0) { return p; }
+    }
+    return undefined;
 }
 
 /** A Python 3.10+ to create the private environment with. */
-function findBasePython(): string[] | undefined {
+async function findBasePython(): Promise<string[] | undefined> {
     const candidates: string[][] = process.platform === 'win32'
         ? [['py', '-3'], ['python'], ['python3']]
         : [['python3.12'], ['python3.11'], ['python3.10'], ['python3'], ['python']];
-    return candidates.find(([cmd, ...args]) => spawnSync(cmd, [...args, '-c',
-        'import sys, venv; sys.exit(0 if sys.version_info >= (3, 10) else 1)'], { timeout: 10000 }).status === 0);
+    for (const [cmd, ...args] of candidates) {
+        if (await probe(cmd, [...args, '-c',
+            'import sys, venv; sys.exit(0 if sys.version_info >= (3, 10) else 1)'], 10000) === 0) {
+            return [cmd, ...args];
+        }
+    }
+    return undefined;
 }
 
 /** Backend dependencies, read from the bundled pyproject.toml so they are listed once. */
@@ -156,7 +171,7 @@ function run(cmd: string, args: string[], token: vscode.CancellationToken): Prom
  * Ollama is not installed: it is optional and left to the user.
  */
 async function setUpManagedEnv(context: vscode.ExtensionContext, backendDir: string): Promise<boolean> {
-    const base = findBasePython();
+    const base = await findBasePython();
     if (!base) {
         const choice = await vscode.window.showErrorMessage(
             'CodeLens needs Python 3.10 or newer to run its local search engine. Install it, then try again.',
@@ -210,7 +225,7 @@ async function ensureBackend(context: vscode.ExtensionContext, client: CodeLensC
         return;
     }
 
-    let python = findPython(context, backendDir);
+    let python = await findPython(context, backendDir);
     if (!python) {
         output.appendLine('No Python environment with the backend dependencies was found.');
         const choice = await vscode.window.showInformationMessage(
@@ -222,7 +237,7 @@ async function ensureBackend(context: vscode.ExtensionContext, client: CodeLensC
             return;
         }
         if (choice !== 'Set Up' || !(await setUpManagedEnv(context, backendDir))) { return; }
-        python = findPython(context, backendDir);
+        python = await findPython(context, backendDir);
         if (!python) {
             vscode.window.showErrorMessage('CodeLens: the environment was created but the backend still cannot ' +
                 'load its packages.', 'Show Logs').then(c => { if (c) { output.show(); } });
