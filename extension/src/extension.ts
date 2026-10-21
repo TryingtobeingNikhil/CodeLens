@@ -231,6 +231,21 @@ async function ensureBackend(context: vscode.ExtensionContext, client: CodeLensC
     }
 
     const port = String(config().get<number>('port', 8000));
+    // A backend that was just stopped may still be releasing the port
+    let busy = await client.portInUse();
+    for (let i = 0; i < 6 && busy; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        if (await client.health()) { return; }
+        busy = await client.portInUse();
+    }
+    if (busy) {
+        output.appendLine(`Port ${port} is in use by another program.`);
+        const choice = await vscode.window.showErrorMessage(
+            `CodeLens: port ${port} is used by another program. Choose a free port in "codelens.port".`,
+            'Open Settings');
+        if (choice) { vscode.commands.executeCommand('workbench.action.openSettings', 'codelens.port'); }
+        return;
+    }
     output.appendLine(`Starting backend: ${python} -m uvicorn backend.main:app --port ${port} (in ${backendDir})`);
     const startedAt = Date.now();
     backendProcess = spawn(python, ['-m', 'uvicorn', 'backend.main:app', '--host', '127.0.0.1', '--port', port], {

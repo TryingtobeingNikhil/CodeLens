@@ -31,9 +31,21 @@ export class CodeLensClient {
 
     async health(timeoutMs = 1500): Promise<HealthResponse | undefined> {
         try {
-            return await this.request<HealthResponse>('/health', {}, timeoutMs);
+            const res = await this.request<HealthResponse>('/health', {}, timeoutMs);
+            // Another program on the same port may also answer /health
+            return typeof res?.db === 'boolean' && 'vector_backend' in res ? res : undefined;
         } catch {
             return undefined;
+        }
+    }
+
+    /** True when something (not necessarily CodeLens) answers HTTP on the port. */
+    async portInUse(timeoutMs = 1500): Promise<boolean> {
+        try {
+            await fetch(this.baseUrl() + '/', { signal: AbortSignal.timeout(timeoutMs) });
+            return true;
+        } catch {
+            return false;
         }
     }
 
