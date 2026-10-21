@@ -62,8 +62,10 @@ def save_repo(repo: str):
         repos[repo] = {"last_indexed": datetime.now().isoformat(timespec="seconds")}
         try:
             os.makedirs(os.path.dirname(REPOS_FILE), exist_ok=True)
-            with open(REPOS_FILE, "w", encoding="utf-8") as f:
+            tmp = REPOS_FILE + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
                 json.dump({"repos": repos}, f, indent=2)
+            os.replace(tmp, REPOS_FILE)  # a crash mid-write must not lose the registry
         except OSError as e:
             logger.error(f"Failed to save repo registry: {e}")
 
