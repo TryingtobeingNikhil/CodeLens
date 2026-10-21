@@ -1,4 +1,7 @@
 import os
+import sqlite3
+
+import pytest
 
 from backend.indexer import Indexer
 from backend.query import search
@@ -163,3 +166,15 @@ def test_sentence_word_matching_a_helper_name_is_not_boosted(db, embedder, repo)
     ix.index()
     assert search("break camelCase names into words", repo=ix.repo)["results"][0]["symbol_name"] == "split_identifier"
     assert search("names", repo=ix.repo)["results"][0]["symbol_name"] == "names"
+
+
+def test_failed_begin_raises_the_real_error(db, monkeypatch):
+    class LockedConn:
+        def execute(self, sql, *args):
+            if sql.startswith("BEGIN"):
+                raise sqlite3.OperationalError("database is locked")
+            raise AssertionError(f"unexpected {sql}")
+
+    monkeypatch.setattr(db, "_conn", lambda: LockedConn())
+    with pytest.raises(sqlite3.OperationalError, match="locked"):
+        db.remove_file("/repo", "a.py")
