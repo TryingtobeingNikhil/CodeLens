@@ -38,15 +38,28 @@ def test_bad_inputs(client):
 
 
 def test_second_index_request_is_rejected_while_first_runs(client, repo, monkeypatch):
-    release = threading.Event()
+    entered, release = threading.Event(), threading.Event()
     original = Indexer.index
 
     def slow_index(self, *args, **kwargs):
+        # The worker has started but hasn't taken the indexer's lock yet
+        entered.set()
         release.wait(5)
         return original(self, *args, **kwargs)
 
     monkeypatch.setattr(Indexer, "index", slow_index)
-    with client.stream("POST", "/index", json={"repo_path": repo}) as resp:
+    first: dict = {}
+
+    def run_first():
+        resp = client.post("/index", json={"repo_path": repo})
+        first["body"] = resp.text
+
+    t = threading.Thread(target=run_first)
+    t.start()
+    try:
+        assert entered.wait(5)
         assert client.post("/index", json={"repo_path": repo}).status_code == 409
+    finally:
         release.set()
-        assert '"complete"' in resp.read().decode()
+        t.join(10)
+    assert '"complete"' in first["body"]
