@@ -1,4 +1,7 @@
 import os
+import sqlite3
+
+import pytest
 
 from backend.indexer import Indexer
 from backend.query import search
@@ -165,6 +168,16 @@ def test_sentence_word_matching_a_helper_name_is_not_boosted(db, embedder, repo)
     assert search("names", repo=ix.repo)["results"][0]["symbol_name"] == "names"
 
 
+def test_failed_begin_raises_the_real_error(db, monkeypatch):
+    class LockedConn:
+        def execute(self, sql, *args):
+            if sql.startswith("BEGIN"):
+                raise sqlite3.OperationalError("database is locked")
+            raise AssertionError(f"unexpected {sql}")
+
+    monkeypatch.setattr(db, "_conn", lambda: LockedConn())
+    with pytest.raises(sqlite3.OperationalError, match="locked"):
+        db.remove_file("/repo", "a.py")
 def test_watcher_start_failure_is_not_fatal(tmp_path, monkeypatch):
     from backend import indexer as indexer_mod
 

@@ -89,8 +89,8 @@ class CodeLensDB:
         """Serialised write transaction."""
         with self._write_lock:
             conn = self._conn()
+            conn.execute("BEGIN IMMEDIATE")
             try:
-                conn.execute("BEGIN IMMEDIATE")
                 yield conn
                 conn.execute("COMMIT")
             except BaseException:
