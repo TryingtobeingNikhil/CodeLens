@@ -28,7 +28,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 REPOS_FILE = os.path.join(Settings.DB_PATH, "repos.json")
-LEGACY_SIDECAR = "last_repo.json"
+# Older versions wrote this next to backend/ (start.sh runs from the project root)
+LEGACY_SIDECAR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "last_repo.json")
 
 _indexers: dict[str, Indexer] = {}
 _registry_lock = threading.Lock()
