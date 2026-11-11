@@ -292,10 +292,15 @@ class Indexer:
     def start_watchdog(self, debounce: float = 1.0):
         if self.observer is not None:
             return
-        self.observer = Observer()
-        self.observer.schedule(RepoEventHandler(self, debounce), self.repo, recursive=True)
-        self.observer.daemon = True
-        self.observer.start()
+        observer = Observer()
+        observer.schedule(RepoEventHandler(self, debounce), self.repo, recursive=True)
+        observer.daemon = True
+        try:
+            observer.start()
+        except OSError as e:  # e.g. inotify watch limit reached
+            logger.error(f"Could not watch {self.repo}: {e}")
+            return
+        self.observer = observer
         logger.info(f"Watching {self.repo}")
 
     def stop_watchdog(self):
