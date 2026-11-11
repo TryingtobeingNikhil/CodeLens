@@ -174,6 +174,7 @@ async def api_index(req: IndexRequest):
     indexer = get_indexer(repo)
     if indexer.indexing:
         raise HTTPException(status_code=409, detail="This repo is already being indexed")
+    indexer.indexing = True  # claim it now: the worker thread takes the lock later
 
     q: asyncio.Queue = asyncio.Queue()
     loop = asyncio.get_running_loop()
