@@ -178,3 +178,13 @@ def test_failed_begin_raises_the_real_error(db, monkeypatch):
     monkeypatch.setattr(db, "_conn", lambda: LockedConn())
     with pytest.raises(sqlite3.OperationalError, match="locked"):
         db.remove_file("/repo", "a.py")
+def test_watcher_start_failure_is_not_fatal(tmp_path, monkeypatch):
+    from backend import indexer as indexer_mod
+
+    def boom(self):
+        raise OSError("inotify watch limit reached")
+
+    monkeypatch.setattr(indexer_mod.Observer, "start", boom)
+    idx = indexer_mod.Indexer(str(tmp_path), db=object(), embedder=object())
+    idx.start_watchdog()
+    assert idx.observer is None
