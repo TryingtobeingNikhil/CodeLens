@@ -2,6 +2,7 @@ import json
 import os
 import threading
 
+from backend import main
 from backend.indexer import Indexer
 from tests.conftest import write
 
@@ -37,6 +38,16 @@ def test_bad_inputs(client):
     assert client.post("/index", json={"repo_path": "/definitely/not/here"}).status_code == 400
 
 
+def test_repo_registry_survives_a_failed_write(client, repo, tmp_path, monkeypatch):
+    main.save_repo(repo)
+
+    def crash(*args, **kwargs):
+        raise OSError("disk full")
+
+    with monkeypatch.context() as m:
+        m.setattr(main.json, "dump", crash)
+        main.save_repo(str(tmp_path))
+    assert repo in main.load_repos()
 def test_second_index_request_is_rejected_while_first_runs(client, repo, monkeypatch):
     release = threading.Event()
     original = Indexer.index
