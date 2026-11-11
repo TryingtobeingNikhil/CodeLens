@@ -1,7 +1,9 @@
 import json
 import os
+import threading
 
 from backend import main
+from backend.indexer import Indexer
 from tests.conftest import write
 
 
@@ -46,3 +48,16 @@ def test_repo_registry_survives_a_failed_write(client, repo, tmp_path, monkeypat
         m.setattr(main.json, "dump", crash)
         main.save_repo(str(tmp_path))
     assert repo in main.load_repos()
+def test_second_index_request_is_rejected_while_first_runs(client, repo, monkeypatch):
+    release = threading.Event()
+    original = Indexer.index
+
+    def slow_index(self, *args, **kwargs):
+        release.wait(5)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Indexer, "index", slow_index)
+    with client.stream("POST", "/index", json={"repo_path": repo}) as resp:
+        assert client.post("/index", json={"repo_path": repo}).status_code == 409
+        release.set()
+        assert '"complete"' in resp.read().decode()

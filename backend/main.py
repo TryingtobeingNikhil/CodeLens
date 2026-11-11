@@ -21,14 +21,15 @@ from pydantic import BaseModel, Field
 from backend.config import Settings
 from backend.db_client import get_db
 from backend.indexer import Indexer
-from backend.query import ExplainError, explain_code, explain_results, run_query, search
+from backend.query import ExplainError, explain_code, explain_results, parse_query, run_query, search
 from backend.suggest import suggest
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 REPOS_FILE = os.path.join(Settings.DB_PATH, "repos.json")
-LEGACY_SIDECAR = "last_repo.json"
+# Older versions wrote this next to backend/ (start.sh runs from the project root)
+LEGACY_SIDECAR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "last_repo.json")
 
 _indexers: dict[str, Indexer] = {}
 _registry_lock = threading.Lock()
@@ -176,6 +177,7 @@ async def api_index(req: IndexRequest):
     indexer = get_indexer(repo)
     if indexer.indexing:
         raise HTTPException(status_code=409, detail="This repo is already being indexed")
+    indexer.indexing = True  # claim it now: the worker thread takes the lock later
 
     q: asyncio.Queue = asyncio.Queue()
     loop = asyncio.get_running_loop()
@@ -220,7 +222,7 @@ def _format_terminal(query: str, data: dict) -> str:
         file_info = f"\033[1;36m{r['file_path']}\033[0m:\033[36m{r['line_start']}\033[0m"
         symbol = f"\033[1;33m{r['symbol_name']}\033[0m"
         lines.append(f"\033[1;37m{i + 1}.\033[0m {file_info} ⚡ {symbol}  "
-                     f"\033[90m[Score: \033[1;35m{score}\033[90m · {r.get('match', '')}]\033[0m")
+                     f"\033[90m[similarity \033[1;35m{score}\033[90m · {r.get('match', '')}]\033[0m")
         snippet = r["chunk_text"].strip().split("\n")
         for snip_line in snippet[:3]:
             lines.append(f"    \033[90m│\033[0m \033[38;5;250m{snip_line.replace(chr(9), '    ')[:80]}\033[0m")
@@ -260,7 +262,8 @@ async def api_explain(req: ExplainRequest):
             found = await asyncio.to_thread(search, req.query, repo, req.top_k)
             if not found["results"]:
                 raise HTTPException(status_code=404, detail="No results to explain")
-            text = await asyncio.to_thread(explain_results, req.query, found["results"])
+            question = parse_query(req.query).text or req.query
+            text = await asyncio.to_thread(explain_results, question, found["results"])
         else:
             raise HTTPException(status_code=400, detail="Send `code` or `query`")
     except ExplainError as e:

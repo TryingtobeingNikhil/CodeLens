@@ -93,6 +93,16 @@ def test_explain_query_uses_search_results(client, repo, monkeypatch):
     assert res.status_code == 200 and "refresh_jwt_token" in res.json()["explain_text"]
 
 
+def test_explain_query_sends_question_without_filters(client, repo, monkeypatch):
+    write(repo, "auth.py", "def refresh_jwt_token(t):\n    return t\n")
+    with client.stream("POST", "/index", json={"repo_path": repo}) as resp:
+        list(resp.iter_lines())
+    sent = []
+    monkeypatch.setattr(query, "_chat", lambda m: sent.append(m[-1]["content"]) or "ok")
+    client.post("/explain", json={"query": "refresh token lang:py -in:tests", "repo_path": repo})
+    assert sent and sent[0].endswith("Question: refresh token")
+
+
 def test_suggestions_endpoint(client, repo):
     write(repo, "kernels/softmax.cu", "__global__ void onlineSoftmaxKernel(float* x) {}\n")
     with client.stream("POST", "/index", json={"repo_path": repo}) as resp:
