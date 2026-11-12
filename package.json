@@ -151,7 +151,9 @@
     "watch": "tsc -watch -p ./",
     "compile": "tsc -p ./",
     "vscode:prepublish": "npm run compile",
-    "package": "vsce package"
+    "package": "vsce package",
+    "build:backend": "python packaging/build_backend.py",
+    "package:target": "vsce package --target"
   },
   "devDependencies": {
     "@types/node": "18.x",
