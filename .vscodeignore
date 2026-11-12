@@ -21,3 +21,4 @@ backend.Dockerfile
 .env.example
 scripts/**
 docs/**
+media/marketplace-icon.svg
