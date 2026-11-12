@@ -11,6 +11,7 @@ let pollInterval: NodeJS.Timeout | undefined;
 let output: vscode.OutputChannel;
 let starting: Promise<void> | undefined;
 let wasOnline = false;
+let failedPolls = 0;
 
 const REQUIRED_MODULES = 'import fastapi, uvicorn, ollama, tree_sitter, numpy, watchdog, dotenv';
 
@@ -304,7 +305,11 @@ function backendEnv(): Record<string, string> {
 
 async function pollStatus(context: vscode.ExtensionContext, client: CodeLensClient, provider: SearchPanelProvider) {
     let health = await client.health();
-    if (!health && wasOnline && !starting && config().get<boolean>('autoStartBackend', true)) {
+    failedPolls = health ? 0 : failedPolls + 1;
+    // /health can outlast its timeout while Ollama is slow, so restart only after two misses
+    // in a row and only once nothing answers on the port (a slow backend still does)
+    if (!health && wasOnline && failedPolls >= 2 && !starting && config().get<boolean>('autoStartBackend', true)
+        && !(await client.portInUse())) {
         // The backend may have belonged to another window that has since closed
         starting = ensureBackend(context, client).finally(() => { starting = undefined; });
         await starting;
