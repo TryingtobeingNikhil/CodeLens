@@ -67,6 +67,13 @@ export async function activate(context: vscode.ExtensionContext) {
             provider.explainSelection(code.slice(0, 12000), file.split(path.sep).join('/'), editor.document.languageId);
         }),
         vscode.commands.registerCommand('codelens.setupBackend', async () => {
+            if (bundledBackend(context)) {
+                // This build ships its own engine; there is nothing to install
+                stopBackend();
+                await ensureBackend(context, client);
+                provider.refreshStatus();
+                return;
+            }
             const dir = resolveBackendDir(context);
             if (!dir) { return; }
             if (await setUpManagedEnv(context, dir)) {
@@ -88,6 +95,21 @@ export async function activate(context: vscode.ExtensionContext) {
         pollStatus(client, provider);
         pollInterval = setInterval(() => pollStatus(client, provider), 15000);
     });
+}
+
+/**
+ * The standalone backend shipped in platform-specific builds (bin/codelens-backend),
+ * which needs no Python on the user's machine. Undefined in the universal build.
+ */
+function bundledBackend(context: vscode.ExtensionContext): string | undefined {
+    if (config().get<string>('pythonPath', '') || config().get<string>('backendPath', '')) { return undefined; }
+    const exe = path.join(context.extensionPath, 'bin', 'codelens-backend',
+        process.platform === 'win32' ? 'codelens-backend.exe' : 'codelens-backend');
+    if (!fs.existsSync(exe)) { return undefined; }
+    if (process.platform !== 'win32') {
+        try { fs.accessSync(exe, fs.constants.X_OK); } catch { fs.chmodSync(exe, 0o755); }
+    }
+    return exe;
 }
 
 /** Directory containing `backend/main.py`: the setting, else the extension's own folder. */
@@ -216,7 +238,8 @@ async function ensureBackend(context: vscode.ExtensionContext, client: CodeLensC
         return;
     }
 
-    const backendDir = resolveBackendDir(context);
+    const bundled = bundledBackend(context);
+    const backendDir = bundled ? path.dirname(bundled) : resolveBackendDir(context);
     if (!backendDir) {
         const choice = await vscode.window.showErrorMessage(
             'CodeLens: backend not found. Set "codelens.backendPath" to the folder that contains backend/main.py.',
@@ -225,8 +248,8 @@ async function ensureBackend(context: vscode.ExtensionContext, client: CodeLensC
         return;
     }
 
-    let python = await findPython(context, backendDir);
-    if (!python) {
+    let python = bundled ? undefined : await findPython(context, backendDir);
+    if (!bundled && !python) {
         output.appendLine('No Python environment with the backend dependencies was found.');
         const choice = await vscode.window.showInformationMessage(
             'CodeLens needs to install its local search engine (Python packages, about 150 MB) ' +
@@ -261,9 +284,12 @@ async function ensureBackend(context: vscode.ExtensionContext, client: CodeLensC
         if (choice) { vscode.commands.executeCommand('workbench.action.openSettings', 'codelens.port'); }
         return;
     }
-    output.appendLine(`Starting backend: ${python} -m uvicorn backend.main:app --port ${port} (in ${backendDir})`);
+    const [cmd, args] = bundled
+        ? [bundled, ['--host', '127.0.0.1', '--port', port]]
+        : [python!, ['-m', 'uvicorn', 'backend.main:app', '--host', '127.0.0.1', '--port', port]];
+    output.appendLine(`Starting backend: ${cmd} ${args.join(' ')} (in ${backendDir})`);
     const startedAt = Date.now();
-    backendProcess = spawn(python, ['-m', 'uvicorn', 'backend.main:app', '--host', '127.0.0.1', '--port', port], {
+    backendProcess = spawn(cmd, args, {
         cwd: backendDir,
         env: {
             ...process.env,

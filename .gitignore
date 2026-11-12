@@ -18,3 +18,5 @@ dist/
 *.egg-info/
 .pytest_cache/
 scripts/demo_video/out/
+bin/
+build/
