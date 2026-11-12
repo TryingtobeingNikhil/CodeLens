@@ -159,5 +159,15 @@
     "@vscode/vsce": "^3.0.0",
     "playwright-core": "^1.48.2",
     "typescript": "^5.3.3"
+  },
+  "icon": "media/icon.png",
+  "license": "MIT",
+  "homepage": "https://github.com/TryingtobeingNikhil/CodeLens#readme",
+  "bugs": {
+    "url": "https://github.com/TryingtobeingNikhil/CodeLens/issues"
+  },
+  "galleryBanner": {
+    "color": "#1E1B4B",
+    "theme": "dark"
   }
 }
